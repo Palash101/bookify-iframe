@@ -130,6 +130,8 @@ export default function HomePage() {
 <script src="YOUR_DOMAIN/embed.js"></script>`}
           </pre>
         </div>
+
+        
       </div>
     </div>
   )

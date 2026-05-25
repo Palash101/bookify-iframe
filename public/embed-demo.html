@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bookify embed demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #f8fafc;
+        min-height: 100vh;
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.5rem;
+      }
+      p {
+        margin: 0 0 24px;
+        color: #94a3b8;
+        max-width: 640px;
+        line-height: 1.5;
+      }
+      iframe {
+        width: 100%;
+        max-width: 900px;
+        height: 700px;
+        border: 0;
+        border-radius: 12px;
+        display: block;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Bookify widget (same-origin demo)</h1>
+    <p>
+      This page is served over HTTPS from your app. Open it via your ngrok URL, not as a
+      local file (<code>file://</code>), or the browser will block the iframe.
+    </p>
+    <iframe
+      src="/widget?ngrok-skip-browser-warning=1"
+      title="Gym Class Booking"
+      allow="clipboard-write"
+    ></iframe>
+  </body>
+</html>
