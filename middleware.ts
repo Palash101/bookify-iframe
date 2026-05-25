@@ -1,23 +1,24 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+function isEmbeddable(pathname: string) {
+  return (
+    pathname.startsWith('/widget') ||
+    pathname === '/embed-demo.html'
+  )
+}
+
 export function middleware(request: NextRequest) {
   const response = NextResponse.next()
-  
-  // Allow the widget page to be embedded in iframes
-  if (request.nextUrl.pathname.startsWith('/widget')) {
-    // Remove X-Frame-Options to allow embedding
+
+  if (isEmbeddable(request.nextUrl.pathname)) {
     response.headers.delete('X-Frame-Options')
-    // Set permissive CSP for iframe embedding
-    response.headers.set(
-      'Content-Security-Policy',
-      "frame-ancestors *"
-    )
+    response.headers.delete('Content-Security-Policy')
   }
-  
+
   return response
 }
 
 export const config = {
-  matcher: ['/widget/:path*']
+  matcher: ['/widget', '/widget/:path*', '/embed-demo.html'],
 }

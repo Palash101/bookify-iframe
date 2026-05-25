@@ -1,4 +1,4 @@
-import { BookingWidget } from '@/components/booking/booking-widget'
+import { BookingWidgetClient } from '@/components/booking/booking-widget-client'
 
 export const metadata = {
   title: 'Bookify - Gym Class Booking Widget',
@@ -6,5 +6,5 @@ export const metadata = {
 }
 
 export default function WidgetPage() {
-  return <BookingWidget />
+  return <BookingWidgetClient />
 }
