@@ -1,11 +1,10 @@
-import { API_BASE_URL, TENENT_KEY } from './config'
+import { API_BASE_URL } from './config'
 
 export function getBookifyHeaders(
   extra?: HeadersInit,
 ): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Tenant-Key': TENENT_KEY,
     'ngrok-skip-browser-warning': '1',
   }
 
