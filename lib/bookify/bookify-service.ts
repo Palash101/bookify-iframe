@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from './api-endpoints'
 import { getBookifyHeaders } from './api-client'
-import { BOOKIFY_PROXY_BASE } from './config'
+import { API_BASE_URL } from './config'
 import type { ApiResponse } from './types'
 
 async function parseJsonResponse<T>(res: Response): Promise<T> {
@@ -17,7 +17,7 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
 }
 
 export class BookifyService {
-  private baseUrl = BOOKIFY_PROXY_BASE
+  private baseUrl = API_BASE_URL
 
   private normalizePath(path: string): string {
     return path.startsWith('/') ? path.slice(1) : path
