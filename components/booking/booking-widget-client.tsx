@@ -1,6 +1,12 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { EmbedBlocked } from '@/components/booking/embed-blocked'
+import {
+  getEmbedParentOrigin,
+  isOriginAllowed,
+} from '@/lib/embed-origins'
 
 const BookingWidget = dynamic(
   () =>
@@ -17,6 +23,29 @@ const BookingWidget = dynamic(
   },
 )
 
+type EmbedStatus = 'checking' | 'allowed' | 'blocked'
+
 export function BookingWidgetClient() {
+  const [status, setStatus] = useState<EmbedStatus>('checking')
+  const [parentOrigin, setParentOrigin] = useState<string | null>(null)
+
+  useEffect(() => {
+    const origin = getEmbedParentOrigin()
+    setParentOrigin(origin)
+    setStatus(isOriginAllowed(origin) ? 'allowed' : 'blocked')
+  }, [])
+
+  if (status === 'checking') {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (status === 'blocked') {
+    return <EmbedBlocked domain={parentOrigin} />
+  }
+
   return <BookingWidget />
 }
