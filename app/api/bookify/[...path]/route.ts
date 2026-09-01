@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildBookifyUrl, getBookifyHeaders } from '@/lib/bookify/api-client'
+import { isOriginAllowed } from '@/lib/embed-origins'
 
 function withCors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', '*')
@@ -27,6 +28,13 @@ async function proxyToBookify(
     const embedOrigin =
       request.headers.get('X-Embed-Origin') ??
       request.headers.get('X-Origin')
+
+    if (embedOrigin && !isOriginAllowed(embedOrigin)) {
+      return withCors(
+        NextResponse.json({ error: 'Embed origin not allowed' }, { status: 403 }),
+      )
+    }
+
     const originForApi = embedOrigin ?? request.headers.get('origin')
 
     const extraHeaders: Record<string, string> = {}

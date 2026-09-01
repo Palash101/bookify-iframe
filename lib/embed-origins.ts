@@ -31,6 +31,7 @@ export function isOriginAllowed(origin: string | null | undefined): boolean {
 }
 
 let embedOriginForApi: string | null = null
+let verifiedParentOrigin: string | null = null
 
 /** Store parent origin for API requests (set once when the widget mounts). */
 export function setEmbedOriginForApi(origin: string | null): void {
@@ -42,6 +43,14 @@ export function getStoredEmbedOriginForApi(): string | null {
   return embedOriginForApi
 }
 
+/**
+ * Set parent origin verified via postMessage (event.origin — browser-controlled).
+ * Takes precedence over referrer-based detection.
+ */
+export function setVerifiedParentOrigin(origin: string | null): void {
+  verifiedParentOrigin = origin
+}
+
 export function isEmbedded(): boolean {
   if (typeof window === 'undefined') return false
   return window.self !== window.top
@@ -50,29 +59,14 @@ export function isEmbedded(): boolean {
 /** Parent page origin when in an iframe; null when opened directly. */
 export function getEmbedOriginForApi(): string | null {
   if (!isEmbedded()) return null
-
-  const parentOrigin = getEmbedParentOrigin()
-  return parentOrigin
+  return getEmbedParentOrigin()
 }
 
-/** Parent page origin when embedded in an iframe; own origin when opened top-level. */
-export function getEmbedParentOrigin(): string | null {
-  if (typeof window === 'undefined') return null
-
-  const fromQuery = new URLSearchParams(window.location.search).get('embed_origin')
-  if (fromQuery) {
-    try {
-      return new URL(fromQuery).origin
-    } catch {
-      return fromQuery
-    }
-  }
-
-  // Opened directly (not in an iframe) — treat as same-origin visit
-  if (window.self === window.top) {
-    return window.location.origin
-  }
-
+/**
+ * Detect parent frame origin from browser APIs only.
+ * Never reads URL params — those can be spoofed by anyone.
+ */
+function detectParentFrameOrigin(): string | null {
   const ancestorOrigins = (
     window.location as Location & { ancestorOrigins?: DOMStringList }
   ).ancestorOrigins
@@ -94,4 +88,20 @@ export function getEmbedParentOrigin(): string | null {
   }
 
   return null
+}
+
+/** Parent page origin when embedded in an iframe; own origin when opened top-level. */
+export function getEmbedParentOrigin(): string | null {
+  if (typeof window === 'undefined') return null
+
+  if (window.self === window.top) {
+    return window.location.origin
+  }
+
+  // postMessage event.origin is browser-verified; preferred over referrer
+  if (verifiedParentOrigin) {
+    return verifiedParentOrigin
+  }
+
+  return detectParentFrameOrigin()
 }
