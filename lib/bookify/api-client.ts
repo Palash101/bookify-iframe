@@ -1,4 +1,5 @@
-import { API_BASE_URL } from './config'
+import { getStoredEmbedOriginForApi } from '@/lib/embed-origins'
+import { API_BASE_URL, TENANT_KEY } from './config'
 
 export function getBookifyHeaders(
   extra?: HeadersInit,
@@ -6,6 +7,15 @@ export function getBookifyHeaders(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'ngrok-skip-browser-warning': '1',
+  }
+
+  if (TENANT_KEY) {
+    headers['X-Tenant-Key'] = TENANT_KEY
+  }
+
+  const embedOrigin = getStoredEmbedOriginForApi()
+  if (embedOrigin) {
+    headers['X-Embed-Origin'] = embedOrigin
   }
 
   if (extra) {

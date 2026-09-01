@@ -6,6 +6,11 @@ function pickId(item: Record<string, unknown>): string {
   return id != null ? String(id) : ''
 }
 
+function pickClassId(item: Record<string, unknown>): string {
+  const id = item.id ?? item._id ?? item.class_id
+  return id != null ? String(id) : ''
+}
+
 function pickName(item: Record<string, unknown>): string {
   const name =
     item.title ??
@@ -24,19 +29,42 @@ export function mapLocation(item: Record<string, unknown>): Location | null {
 }
 
 export function mapTrainingProgram(item: Record<string, unknown>): TrainingProgram | null {
-  const id = pickId(item)
+  const id = pickTrainingProgramId(item) ?? pickId(item)
   if (!id) return null
   return { id, name: pickName(item), raw: item }
 }
 
 export function pickTrainingProgramId(item: Record<string, unknown>): string | undefined {
+  const program =
+    item.program && typeof item.program === 'object'
+      ? (item.program as Record<string, unknown>)
+      : undefined
+
   const id =
     item.training_programme_id ??
     item.training_program_id ??
     item.trainingProgramId ??
     item.program_id ??
-    item.programId
+    item.programId ??
+    program?.id ??
+    program?.program_id
+
   return id != null ? String(id) : undefined
+}
+
+/** Normalize API date values to YYYY-MM-DD for reliable comparisons. */
+export function normalizeDateKey(value: string | undefined | null): string | null {
+  if (!value) return null
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!match) return null
+  return `${match[1]}-${match[2]}-${match[3]}`
+}
+
+export function toDateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 
 function parseClockTime(value: string): string {
@@ -112,12 +140,13 @@ export function getClassStartDate(item: Record<string, unknown>): Date | null {
 }
 
 export function mapBookifyClass(item: Record<string, unknown>): GymClass | null {
-  const id = pickId(item)
+  const id = pickClassId(item)
   if (!id) return null
 
   const startTime = String(item.start_time ?? item.startTime ?? '')
   const endTime = String(item.end_time ?? item.endTime ?? '')
   const classDate = item.class_date ? String(item.class_date) : undefined
+  const normalizedClassDate = normalizeDateKey(classDate)
 
   const capacity = Number(item.max_bookings ?? item.capacity ?? item.max_capacity ?? 0)
   const enrolled = Number(
@@ -139,8 +168,11 @@ export function mapBookifyClass(item: Record<string, unknown>): GymClass | null 
     description: buildDescription(item),
     image: pickImage(item),
     trainingProgramId: pickTrainingProgramId(item),
-    startDate: classDate ?? getClassStartDate(item)?.toISOString().split('T')[0],
-    classDate,
+    startDate:
+      normalizedClassDate ??
+      normalizeDateKey(getClassStartDate(item)?.toISOString()) ??
+      undefined,
+    classDate: normalizedClassDate ?? classDate,
     endTime: endTime || undefined,
     price: item.price != null ? String(item.price) : undefined,
     gender: item.gender != null ? String(item.gender) : undefined,
@@ -228,7 +260,12 @@ export function unwrapList(response: ApiResponse<unknown>): Record<string, unkno
 
   const data = response.data
   if (data && typeof data === 'object' && !Array.isArray(data)) {
-    for (const value of Object.values(data as Record<string, unknown>)) {
+    const record = data as Record<string, unknown>
+    for (const key of ['items', 'classes', 'results', 'records']) {
+      const value = record[key]
+      if (Array.isArray(value)) return value as Record<string, unknown>[]
+    }
+    for (const value of Object.values(record)) {
       if (Array.isArray(value)) return value as Record<string, unknown>[]
     }
   }

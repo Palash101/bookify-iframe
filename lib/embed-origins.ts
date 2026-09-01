@@ -19,6 +19,29 @@ export function isOriginAllowed(origin: string | null | undefined): boolean {
   return ALLOWED_EMBED_ORIGINS.includes(origin)
 }
 
+let embedOriginForApi: string | null = null
+
+/** Store parent origin for API requests (set once when the widget mounts). */
+export function setEmbedOriginForApi(origin: string | null): void {
+  embedOriginForApi = origin
+}
+
+/** Parent origin to attach to API calls when embedded; null when opened top-level. */
+export function getStoredEmbedOriginForApi(): string | null {
+  return embedOriginForApi
+}
+
+export function isEmbedded(): boolean {
+  if (typeof window === 'undefined') return false
+  return window.self !== window.top
+}
+
+/** Parent page origin when in an iframe; null when opened directly. */
+export function getEmbedOriginForApi(): string | null {
+  if (!isEmbedded()) return null
+  return getEmbedParentOrigin()
+}
+
 /** Parent page origin when embedded in an iframe; own origin when opened top-level. */
 export function getEmbedParentOrigin(): string | null {
   if (typeof window === 'undefined') return null

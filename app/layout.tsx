@@ -7,8 +7,8 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Bookify - Gym Class Booking Widget',
-  description: 'Embeddable gym class booking widget with calendar, class selection, and seat booking',
+  title: 'Fitnezstudios - Gym Class Booking',
+  description: 'Book gym classes at Fitnezstudios — calendar, class selection, and seat booking',
   generator: 'v0.app',
   icons: {
     icon: [

@@ -1,8 +1,8 @@
 import { BookingWidgetClient } from '@/components/booking/booking-widget-client'
 
 export const metadata = {
-  title: 'Bookify - Gym Class Booking Widget',
-  description: 'Book your gym classes easily',
+  title: 'Fitnezstudios - Gym Class Booking',
+  description: 'Book your gym classes at Fitnezstudios',
 }
 
 export default function WidgetPage() {

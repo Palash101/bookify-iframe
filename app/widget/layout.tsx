@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Bookify Widget',
-  description: 'Embeddable Gym Class Booking Widget',
+  title: 'Fitnezstudios Widget',
+  description: 'Fitnezstudios Gym Class Booking Widget',
   robots: { index: false, follow: false },
 }
 
