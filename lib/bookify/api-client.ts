@@ -16,6 +16,8 @@ export function getBookifyHeaders(
   const embedOrigin = getStoredEmbedOriginForApi()
   if (embedOrigin) {
     headers['X-Embed-Origin'] = embedOrigin
+    // Backend may use this as the tenant/site origin (browser Origin cannot be overridden)
+    headers['X-Origin'] = embedOrigin
   }
 
   if (extra) {

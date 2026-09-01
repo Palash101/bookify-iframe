@@ -8,15 +8,26 @@ export const ALLOWED_EMBED_ORIGINS = (
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'https://fitmecom.vercel.app',
+    'https://jimmy.fitnezstudios.com',
   ].join(',')
 )
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean)
 
+function isFitnezstudiosSubdomain(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname
+    return host === 'fitnezstudios.com' || host.endsWith('.fitnezstudios.com')
+  } catch {
+    return false
+  }
+}
+
 export function isOriginAllowed(origin: string | null | undefined): boolean {
   if (!origin) return false
-  return ALLOWED_EMBED_ORIGINS.includes(origin)
+  if (ALLOWED_EMBED_ORIGINS.includes(origin)) return true
+  return isFitnezstudiosSubdomain(origin)
 }
 
 let embedOriginForApi: string | null = null
@@ -39,12 +50,23 @@ export function isEmbedded(): boolean {
 /** Parent page origin when in an iframe; null when opened directly. */
 export function getEmbedOriginForApi(): string | null {
   if (!isEmbedded()) return null
-  return getEmbedParentOrigin()
+
+  const parentOrigin = getEmbedParentOrigin()
+  return parentOrigin
 }
 
 /** Parent page origin when embedded in an iframe; own origin when opened top-level. */
 export function getEmbedParentOrigin(): string | null {
   if (typeof window === 'undefined') return null
+
+  const fromQuery = new URLSearchParams(window.location.search).get('embed_origin')
+  if (fromQuery) {
+    try {
+      return new URL(fromQuery).origin
+    } catch {
+      return fromQuery
+    }
+  }
 
   // Opened directly (not in an iframe) — treat as same-origin visit
   if (window.self === window.top) {

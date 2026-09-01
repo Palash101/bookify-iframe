@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { EmbedBlocked } from '@/components/booking/embed-blocked'
 import {
@@ -31,9 +31,10 @@ export function BookingWidgetClient() {
   const [status, setStatus] = useState<EmbedStatus>('checking')
   const [parentOrigin, setParentOrigin] = useState<string | null>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const origin = getEmbedParentOrigin()
-    setEmbedOriginForApi(getEmbedOriginForApi())
+    const apiOrigin = getEmbedOriginForApi()
+    setEmbedOriginForApi(apiOrigin)
     setParentOrigin(origin)
     setStatus(isOriginAllowed(origin) ? 'allowed' : 'blocked')
   }, [])

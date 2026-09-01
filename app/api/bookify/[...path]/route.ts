@@ -5,7 +5,7 @@ function withCors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', '*')
   response.headers.set(
     'Access-Control-Allow-Headers',
-    'Content-Type, X-Tenant-Key, X-Embed-Origin',
+    'Content-Type, X-Tenant-Key, X-Embed-Origin, X-Origin',
   )
   return response
 }
@@ -24,12 +24,22 @@ async function proxyToBookify(
     method === 'GET' || method === 'HEAD' ? undefined : await request.text()
 
   try {
-    const embedOrigin = request.headers.get('X-Embed-Origin')
+    const embedOrigin =
+      request.headers.get('X-Embed-Origin') ??
+      request.headers.get('X-Origin')
+    const originForApi = embedOrigin ?? request.headers.get('origin')
+
+    const extraHeaders: Record<string, string> = {}
+    if (originForApi) {
+      // API validates allowed domains via Origin — use parent site when embedded
+      extraHeaders['Origin'] = originForApi
+      extraHeaders['Referer'] = `${originForApi}/`
+      extraHeaders['X-Embed-Origin'] = originForApi
+      extraHeaders['X-Origin'] = originForApi
+    }
     const upstream = await fetch(url, {
       method,
-      headers: getBookifyHeaders(
-        embedOrigin ? { 'X-Embed-Origin': embedOrigin } : undefined,
-      ),
+      headers: getBookifyHeaders(extraHeaders),
       body: body || undefined,
       cache: 'no-store',
     })
