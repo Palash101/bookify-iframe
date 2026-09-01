@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { EmbedBlocked } from '@/components/booking/embed-blocked'
 import {
+  getEmbedOriginForApi,
   getEmbedParentOrigin,
   isOriginAllowed,
+  setEmbedOriginForApi,
 } from '@/lib/embed-origins'
 
 const BookingWidget = dynamic(
@@ -31,6 +33,7 @@ export function BookingWidgetClient() {
 
   useEffect(() => {
     const origin = getEmbedParentOrigin()
+    setEmbedOriginForApi(getEmbedOriginForApi())
     setParentOrigin(origin)
     setStatus(isOriginAllowed(origin) ? 'allowed' : 'blocked')
   }, [])

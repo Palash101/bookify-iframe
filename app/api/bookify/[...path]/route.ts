@@ -5,7 +5,7 @@ function withCors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', '*')
   response.headers.set(
     'Access-Control-Allow-Headers',
-    'Content-Type, X-Tenant-Key',
+    'Content-Type, X-Tenant-Key, X-Embed-Origin',
   )
   return response
 }
@@ -24,9 +24,12 @@ async function proxyToBookify(
     method === 'GET' || method === 'HEAD' ? undefined : await request.text()
 
   try {
+    const embedOrigin = request.headers.get('X-Embed-Origin')
     const upstream = await fetch(url, {
       method,
-      headers: getBookifyHeaders(),
+      headers: getBookifyHeaders(
+        embedOrigin ? { 'X-Embed-Origin': embedOrigin } : undefined,
+      ),
       body: body || undefined,
       cache: 'no-store',
     })

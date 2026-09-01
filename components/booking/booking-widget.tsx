@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { DateCalendar } from '@/components/booking/date-calendar'
 import { ClassList } from '@/components/booking/class-list'
 import { ClassDetails } from '@/components/booking/class-details'
@@ -13,7 +13,9 @@ import {
   mapBookifyClass,
   mapLocation,
   mapTrainingProgram,
+  normalizeDateKey,
   toClassDetails,
+  toDateKey,
   unwrapList,
 } from '@/lib/bookify/mappers'
 import type { Location, TrainingProgram } from '@/lib/bookify/types'
@@ -76,7 +78,7 @@ export interface Booking {
   status: string
 }
 
-type Step = 'calendar' | 'classes' | 'details' | 'booking' | 'success'
+type Step = 'calendar' | 'details' | 'booking' | 'success'
 
 const CALENDAR_DAYS = 10
 
@@ -181,61 +183,88 @@ export function BookingWidget() {
     }
   }, [selectedLocationId])
 
+  const getClassProgramIds = useCallback((gymClass: GymClass): string[] => {
+    const ids = new Set<string>()
+    if (gymClass.trainingProgramId) {
+      ids.add(String(gymClass.trainingProgramId))
+    }
+    const program = gymClass.raw?.program
+    if (program && typeof program === 'object') {
+      const programId = (program as Record<string, unknown>).id
+      if (programId != null) ids.add(String(programId))
+    }
+    return [...ids]
+  }, [])
+
   const filterClasses = useCallback(
     (items: GymClass[], date: Date) => {
+      const selectedDateKey = toDateKey(date)
+
       return items.filter((gymClass) => {
-        if (gymClass.classDate || gymClass.startDate) {
-          const dateStr = gymClass.classDate ?? gymClass.startDate?.split('T')[0]
-          if (dateStr) {
-            const [y, m, d] = dateStr.split('-').map(Number)
-            const classDay = new Date(y, m - 1, d)
-            if (classDay.toDateString() !== date.toDateString()) {
-              return false
-            }
-          }
+        const classDateKey = normalizeDateKey(
+          gymClass.classDate ?? gymClass.startDate ?? null,
+        )
+
+        if (classDateKey && classDateKey !== selectedDateKey) {
+          return false
         }
 
         if (selectedProgramIds.length === 0) return true
-        if (!gymClass.trainingProgramId) return true
-        return selectedProgramIds.includes(gymClass.trainingProgramId)
+
+        const classProgramIds = getClassProgramIds(gymClass)
+        if (classProgramIds.length === 0) return true
+
+        return selectedProgramIds.some((id) =>
+          classProgramIds.includes(String(id)),
+        )
       })
     },
-    [selectedProgramIds],
+    [selectedProgramIds, getClassProgramIds],
   )
 
-  const fetchClassesForDate = useCallback(
-    async (date: Date) => {
-      if (!selectedLocationId) return
+  const fetchClasses = useCallback(async () => {
+    if (!selectedLocationId) return
 
-      setLoading(true)
-      setError(null)
-      try {
-        const response = await bookifyService.getClasses(
-          { days: CALENDAR_DAYS, sort_order: 'asc' },
-          selectedLocationId,
-        )
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await bookifyService.getClasses(
+        { days: CALENDAR_DAYS, sort_order: 'asc' },
+        selectedLocationId,
+      )
 
-        const mapped = unwrapList(response)
-          .map(mapBookifyClass)
-          .filter((item): item is GymClass => item != null)
+      const mapped = unwrapList(response)
+        .map(mapBookifyClass)
+        .filter((item): item is GymClass => item != null)
 
-        setFetchedClasses(mapped)
-        setCurrentStep('classes')
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch classes')
-        setCurrentStep('calendar')
-      } finally {
-        setLoading(false)
-      }
-    },
-    [selectedLocationId],
-  )
+      setFetchedClasses(mapped)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch classes')
+      setFetchedClasses([])
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedLocationId])
 
   useEffect(() => {
-    if (selectedDate && selectedLocationId) {
-      fetchClassesForDate(selectedDate)
+    if (selectedLocationId) {
+      fetchClasses()
+    } else {
+      setFetchedClasses([])
     }
-  }, [selectedDate, selectedLocationId, fetchClassesForDate])
+  }, [selectedLocationId, fetchClasses])
+
+  const programFilteredClasses = useMemo(() => {
+    if (selectedProgramIds.length === 0) return fetchedClasses
+
+    return fetchedClasses.filter((gymClass) => {
+      const classProgramIds = getClassProgramIds(gymClass)
+      if (classProgramIds.length === 0) return true
+      return selectedProgramIds.some((id) =>
+        classProgramIds.includes(String(id)),
+      )
+    })
+  }, [fetchedClasses, selectedProgramIds, getClassProgramIds])
 
   useEffect(() => {
     if (!selectedDate) {
@@ -245,10 +274,31 @@ export function BookingWidget() {
     setClasses(filterClasses(fetchedClasses, selectedDate))
   }, [fetchedClasses, selectedDate, selectedProgramIds, filterClasses])
 
+  const classDates = useMemo(
+    () =>
+      [
+        ...new Set(
+          programFilteredClasses
+            .map((gymClass) =>
+              normalizeDateKey(gymClass.classDate ?? gymClass.startDate ?? null),
+            )
+            .filter((date): date is string => date != null),
+        ),
+      ].sort(),
+    [programFilteredClasses],
+  )
+
+  useEffect(() => {
+    if (classDates.length === 0 || selectedDate) return
+
+    const [y, m, d] = classDates[0].split('-').map(Number)
+    setSelectedDate(new Date(y, m - 1, d))
+  }, [classDates, selectedDate])
+
   const handleDateSelect = (date: Date) => {
-    setSelectedDate(date)
-    setFetchedClasses([])
-    setClasses([])
+    const normalized = new Date(date)
+    normalized.setHours(0, 0, 0, 0)
+    setSelectedDate(normalized)
   }
 
   const handleClassSelect = (gymClass: GymClass) => {
@@ -295,14 +345,8 @@ export function BookingWidget() {
 
   const handleBack = () => {
     switch (currentStep) {
-      case 'classes':
-        setCurrentStep('calendar')
-        setSelectedDate(null)
-        setFetchedClasses([])
-        setClasses([])
-        break
       case 'details':
-        setCurrentStep('classes')
+        setCurrentStep('calendar')
         setSelectedClass(null)
         break
       case 'booking':
@@ -335,12 +379,16 @@ export function BookingWidget() {
     loading && (currentStep === 'details' || currentStep === 'booking')
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl p-4">
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="mx-auto max-w-4xl flex-1 p-4">
         <header className="mb-6 flex items-center justify-between border-b border-border pb-4">
           <div>
-            <h1 className="text-xl font-semibold text-foreground">Bookify</h1>
-            <p className="text-sm text-muted-foreground">Book your gym class</p>
+            <h1 className="text-xl font-semibold text-foreground">
+              Fitnezstudios
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Book your gym class
+            </p>
           </div>
           {currentStep !== 'calendar' && currentStep !== 'success' && (
             <button
@@ -386,7 +434,6 @@ export function BookingWidget() {
                   onValueChange={(id) => {
                     setSelectedLocationId(id)
                     setSelectedDate(null)
-                    setFetchedClasses([])
                     setClasses([])
                   }}
                   disabled={locations.length === 0}
@@ -408,12 +455,21 @@ export function BookingWidget() {
                 <DateCalendar
                   selectedDate={selectedDate}
                   onDateSelect={handleDateSelect}
+                  classDates={classDates}
                 />
 
-                {loading && selectedDate && (
+                {selectedDate && loading && fetchedClasses.length === 0 && (
                   <div className="flex justify-center py-4">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>
+                )}
+
+                {selectedDate && (!loading || fetchedClasses.length > 0) && (
+                  <ClassList
+                    date={selectedDate}
+                    classes={classes}
+                    onClassSelect={handleClassSelect}
+                  />
                 )}
               </>
             )}
@@ -428,22 +484,6 @@ export function BookingWidget() {
 
         {!showFullPageLoader && (
           <>
-            {currentStep === 'classes' && selectedDate && (
-              <>
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                  </div>
-                ) : (
-                  <ClassList
-                    date={selectedDate}
-                    classes={classes}
-                    onClassSelect={handleClassSelect}
-                  />
-                )}
-              </>
-            )}
-
             {currentStep === 'details' && selectedClass && (
               <ClassDetails
                 classDetails={selectedClass}
@@ -475,6 +515,12 @@ export function BookingWidget() {
           </>
         )}
       </div>
+
+      <footer className="border-t border-border py-3 text-center">
+        <p className="text-xs text-muted-foreground">
+          Powered by FitnezStudios
+        </p>
+      </footer>
     </div>
   )
 }

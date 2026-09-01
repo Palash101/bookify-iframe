@@ -44,10 +44,11 @@ export class BookifyService {
 
       const body = await parseJsonResponse<ApiResponse<T>>(res)
 
-      if (!res.ok) {
+      if (!res.ok || body.success === false) {
         throw new Error(
           body.message ||
             (body as { error?: string }).error ||
+            (body as { detail?: string }).detail ||
             `Request failed (${res.status})`,
         )
       }
@@ -88,10 +89,17 @@ export class BookifyService {
   }
 
   async getClasses(
-    params: { days: number; sort_order: string },
+    params: { days: number; sort_order: string; class_date?: string },
     locationId?: string,
   ): Promise<ApiResponse<unknown[]>> {
-    const queryString = `days=${params.days}&sort_order=${params.sort_order}`
+    const query = new URLSearchParams({
+      days: String(params.days),
+      sort_order: params.sort_order,
+    })
+    if (params.class_date) {
+      query.set('class_date', params.class_date)
+    }
+    const queryString = query.toString()
     if (locationId) {
       return this.get(`/locations/${locationId}/classes?${queryString}`)
     }

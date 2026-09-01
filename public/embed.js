@@ -1,18 +1,18 @@
 /**
- * Bookify Embed Script
+ * Fitnezstudios Embed Script
  * 
  * Usage:
- * 1. Add a container div with id="bookify-widget"
+ * 1. Add a container div with id="fitnezstudios-widget"
  * 2. Include this script on your page
  * 3. The widget will automatically load in the container
  * 
  * Example:
- * <div id="bookify-widget"></div>
+ * <div id="fitnezstudios-widget"></div>
  * <script src="YOUR_DOMAIN/embed.js"></script>
  * 
  * Or manually initialize with options:
  * <script>
- *   window.BookifyWidget.init({
+ *   window.FitnezstudiosWidget.init({
  *     container: '#my-container',
  *     width: '100%',
  *     height: '700px'
@@ -37,7 +37,7 @@
   })();
 
   const DEFAULT_OPTIONS = {
-    container: '#bookify-widget',
+    container: '#fitnezstudios-widget',
     width: '100%',
     height: '700px',
     minHeight: '600px',
@@ -54,7 +54,7 @@
       : config.container;
 
     if (!container) {
-      console.error('Bookify Widget: Container not found:', config.container);
+      console.error('Fitnezstudios Widget: Container not found:', config.container);
       return null;
     }
 
@@ -75,7 +75,7 @@
     // Allow necessary features
     iframe.setAttribute('allow', 'clipboard-write');
     iframe.setAttribute('loading', 'lazy');
-    iframe.setAttribute('title', 'Bookify - Gym Class Booking');
+    iframe.setAttribute('title', 'Fitnezstudios - Gym Class Booking');
 
     // Clear container and append iframe
     container.innerHTML = '';
@@ -104,17 +104,20 @@
 
   // Auto-initialize if container exists
   function autoInit() {
-    const defaultContainer = document.querySelector('#bookify-widget');
-    if (defaultContainer) {
-      createWidget({ container: defaultContainer });
+    const container =
+      document.querySelector('#fitnezstudios-widget') ||
+      document.querySelector('#bookify-widget');
+    if (container) {
+      createWidget({ container });
     }
   }
 
-  // Expose API
-  window.BookifyWidget = {
+  // Expose API (BookifyWidget kept as alias for backward compatibility)
+  window.FitnezstudiosWidget = {
     init: createWidget,
     WIDGET_URL: WIDGET_URL
   };
+  window.BookifyWidget = window.FitnezstudiosWidget;
 
   // Auto-init on DOM ready
   if (document.readyState === 'loading') {

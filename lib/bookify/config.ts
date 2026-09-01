@@ -1,4 +1,9 @@
-export const API_BASE_URL =
-  'https://api.fitnezstudios.com/api/v1/client'
+const API_ORIGIN =
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  process.env.BOOKIFY_API_URL ??
+  'https://api.fitnezstudios.com'
 
-// export const TENENT_KEY = 'FITME_f2cdbe0d-8eb9-41d9-991b-f53ac06b3949'
+export const API_BASE_URL = `${API_ORIGIN.replace(/\/$/, '')}/api/v1/client`
+
+export const TENANT_KEY =
+  process.env.NEXT_PUBLIC_TENANT_KEY ?? process.env.TENANT_KEY ?? ''
