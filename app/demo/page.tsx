@@ -1,12 +1,15 @@
-export default function DemoPage() {
+'use client'
+
+import { useEffect, useState } from 'react'
+
+function DemoPage() {
   return (
     <iframe
-      src="/widget"
+      src="http://localhost:3000/widget?embed_origin=https%3A%2F%2Fjimmy.fitnezstudios.com"
       width="100%"
       height="700"
       frameBorder={0}
-      title="Fitnezstudios - Gym Class Booking"
-      style={{ display: 'block', border: 0 }}
-    />
+    ></iframe>
   )
 }
+export default DemoPage

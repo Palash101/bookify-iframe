@@ -1,6 +1,6 @@
 import { API_ENDPOINTS } from './api-endpoints'
 import { getBookifyHeaders } from './api-client'
-import { API_BASE_URL } from './config'
+import { CLIENT_API_PROXY } from './config'
 import type { ApiResponse } from './types'
 
 async function parseJsonResponse<T>(res: Response): Promise<T> {
@@ -17,7 +17,8 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
 }
 
 export class BookifyService {
-  private baseUrl = API_BASE_URL
+  /** Proxied through Next.js so the upstream API gets the parent site's Origin header. */
+  private baseUrl = CLIENT_API_PROXY
 
   private normalizePath(path: string): string {
     return path.startsWith('/') ? path.slice(1) : path

@@ -60,7 +60,8 @@
 
     // Create iframe
     const iframe = document.createElement('iframe');
-    iframe.src = WIDGET_URL;
+    const embedOrigin = encodeURIComponent(window.location.origin);
+    iframe.src = WIDGET_URL + (WIDGET_URL.includes('?') ? '&' : '?') + 'embed_origin=' + embedOrigin;
     iframe.style.width = config.width;
     iframe.style.height = config.height;
     iframe.style.minHeight = config.minHeight;
