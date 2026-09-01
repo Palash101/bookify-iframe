@@ -1,15 +1,12 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-
-function DemoPage() {
+export default function DemoPage() {
   return (
     <iframe
-      src="http://localhost:3000/widget?embed_origin=https%3A%2F%2Fjimmy.fitnezstudios.com"
+      src="https://fitmecom.vercel.app/widget"
       width="100%"
       height="700"
       frameBorder={0}
-    ></iframe>
+      title="Fitnezstudios - Gym Class Booking"
+      style={{ display: 'block', border: 0 }}
+    />
   )
 }
-export default DemoPage

@@ -58,10 +58,10 @@
       return null;
     }
 
-    // Create iframe
+    // Create iframe — parent origin is detected inside the widget via
+    // postMessage / ancestorOrigins / document.referrer (never URL params)
     const iframe = document.createElement('iframe');
-    const embedOrigin = encodeURIComponent(window.location.origin);
-    iframe.src = WIDGET_URL + (WIDGET_URL.includes('?') ? '&' : '?') + 'embed_origin=' + embedOrigin;
+    iframe.src = WIDGET_URL;
     iframe.style.width = config.width;
     iframe.style.height = config.height;
     iframe.style.minHeight = config.minHeight;
@@ -77,6 +77,16 @@
     iframe.setAttribute('allow', 'clipboard-write');
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('title', 'Fitnezstudios - Gym Class Booking');
+
+    // Notify widget of parent origin — event.origin is browser-verified
+    iframe.addEventListener('load', function() {
+      try {
+        const widgetOrigin = new URL(WIDGET_URL).origin;
+        iframe.contentWindow.postMessage({ type: 'BOOKIFY_EMBED_INIT' }, widgetOrigin);
+      } catch (e) {
+        console.warn('Fitnezstudios Widget: could not post embed init message', e);
+      }
+    });
 
     // Clear container and append iframe
     container.innerHTML = '';

@@ -6,9 +6,13 @@ import { EmbedBlocked } from '@/components/booking/embed-blocked'
 import {
   getEmbedOriginForApi,
   getEmbedParentOrigin,
+  isEmbedded,
   isOriginAllowed,
   setEmbedOriginForApi,
+  setVerifiedParentOrigin,
 } from '@/lib/embed-origins'
+
+const BOOKIFY_EMBED_INIT = 'BOOKIFY_EMBED_INIT'
 
 const BookingWidget = dynamic(
   () =>
@@ -32,11 +36,33 @@ export function BookingWidgetClient() {
   const [parentOrigin, setParentOrigin] = useState<string | null>(null)
 
   useLayoutEffect(() => {
-    const origin = getEmbedParentOrigin()
-    const apiOrigin = getEmbedOriginForApi()
-    setEmbedOriginForApi(apiOrigin)
-    setParentOrigin(origin)
-    setStatus(isOriginAllowed(origin) ? 'allowed' : 'blocked')
+    const resolveEmbed = () => {
+      const origin = getEmbedParentOrigin()
+      const apiOrigin = getEmbedOriginForApi()
+      setEmbedOriginForApi(apiOrigin)
+      setParentOrigin(origin)
+      setStatus(isOriginAllowed(origin) ? 'allowed' : 'blocked')
+    }
+
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type !== BOOKIFY_EMBED_INIT) return
+      // event.origin is set by the browser — cannot be spoofed by the iframe
+      setVerifiedParentOrigin(event.origin)
+      resolveEmbed()
+    }
+
+    window.addEventListener('message', onMessage)
+    resolveEmbed()
+
+    // Allow embed.js postMessage to arrive before finalizing
+    const timeout = isEmbedded()
+      ? setTimeout(resolveEmbed, 200)
+      : undefined
+
+    return () => {
+      window.removeEventListener('message', onMessage)
+      if (timeout) clearTimeout(timeout)
+    }
   }, [])
 
   if (status === 'checking') {
