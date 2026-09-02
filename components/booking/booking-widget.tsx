@@ -7,18 +7,19 @@ import { ClassDetails } from '@/components/booking/class-details'
 import { BookingForm } from '@/components/booking/booking-form'
 import { BookingSuccess } from '@/components/booking/booking-success'
 import { LocationSelect } from '@/components/booking/location-select'
-import { TrainingProgramFilter } from '@/components/booking/training-program-filter'
 import { bookifyService } from '@/lib/bookify/bookify-service'
 import {
   mapBookifyClass,
+  mapGym,
   mapLocation,
   mapTrainingProgram,
   normalizeDateKey,
   toClassDetails,
   toDateKey,
   unwrapList,
+  unwrapRecord,
 } from '@/lib/bookify/mappers'
-import type { Location, TrainingProgram } from '@/lib/bookify/types'
+import type { Gym, Location, TrainingProgram } from '@/lib/bookify/types'
 
 export interface GymClass {
   id: string
@@ -31,6 +32,8 @@ export interface GymClass {
   category: string
   description: string
   image: string
+  trainerImage?: string
+  locationName?: string
   trainingProgramId?: string
   startDate?: string
   classDate?: string
@@ -84,6 +87,7 @@ const CALENDAR_DAYS = 10
 
 export function BookingWidget() {
   const [currentStep, setCurrentStep] = useState<Step>('calendar')
+  const [gym, setGym] = useState<Gym | null>(null)
   const [locations, setLocations] = useState<Location[]>([])
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
   const [trainingPrograms, setTrainingPrograms] = useState<TrainingProgram[]>([])
@@ -103,27 +107,34 @@ export function BookingWidget() {
   useEffect(() => {
     let cancelled = false
 
-    const loadLocations = async () => {
+    const loadInitialData = async () => {
       setLoadingLocations(true)
       setError(null)
 
       try {
-        const response = await bookifyService.getLocations()
+        const [gymResponse, locationsResponse] = await Promise.all([
+          bookifyService.getGym(),
+          bookifyService.getLocations(),
+        ])
+
         if (cancelled) return
 
-        const mapped = unwrapList(response)
+        const mappedGym = mapGym(unwrapRecord(gymResponse))
+        const mappedLocations = unwrapList(locationsResponse)
           .map(mapLocation)
           .filter((item): item is Location => item != null)
 
-        setLocations(mapped)
-        if (mapped.length > 0) {
-          setSelectedLocationId(mapped[0].id)
+        setGym(mappedGym)
+        setLocations(mappedLocations)
+
+        if (mappedLocations.length > 0) {
+          setSelectedLocationId(mappedLocations[0].id)
         } else {
           setError('No locations found for this tenant.')
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load locations')
+          setError(err instanceof Error ? err.message : 'Failed to load widget data')
         }
       } finally {
         if (!cancelled) {
@@ -133,7 +144,7 @@ export function BookingWidget() {
       }
     }
 
-    loadLocations()
+    loadInitialData()
 
     return () => {
       cancelled = true
@@ -375,25 +386,44 @@ export function BookingWidget() {
     setBooking(null)
   }
 
+  const selectedLocation = useMemo(
+    () => locations.find((loc) => loc.id === selectedLocationId),
+    [locations, selectedLocationId],
+  )
+
+  const handleShowAll = () => {
+    setSelectedProgramIds([])
+  }
+
+  const handleToday = () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    setSelectedDate(today)
+  }
+
+  const timezoneLabel = useMemo(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const offset = -new Date().getTimezoneOffset() / 60
+      const sign = offset >= 0 ? '+' : ''
+      const city = tz.split('/').pop()?.replace(/_/g, ' ') ?? tz
+      return `${city} GMT${sign}${offset}`
+    } catch {
+      return 'Local time'
+    }
+  }, [])
+
   const showFullPageLoader =
     loading && (currentStep === 'details' || currentStep === 'booking')
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <div className="mx-auto max-w-4xl flex-1 p-4">
-        <header className="mb-6 flex items-center justify-between border-b border-border pb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">
-              Fitnezstudios
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Book your gym class
-            </p>
-          </div>
-          {currentStep !== 'calendar' && currentStep !== 'success' && (
+      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        {currentStep !== 'calendar' && currentStep !== 'success' && (
+          <div className="mb-4">
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+              className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -410,47 +440,30 @@ export function BookingWidget() {
               </svg>
               Back
             </button>
-          )}
-        </header>
+          </div>
+        )}
 
         {error && (
-          <div className="mb-4 rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="mb-4 rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
             {error}
           </div>
         )}
 
         {currentStep === 'calendar' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {!ready || loadingLocations ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-8">
+              <div className="flex flex-col items-center justify-center gap-3 py-16">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                <p className="text-sm text-muted-foreground">Loading locations…</p>
+                <p className="text-sm text-muted-foreground">Loading widget…</p>
               </div>
             ) : (
               <>
-                <LocationSelect
-                  locations={locations}
-                  value={selectedLocationId}
-                  onValueChange={(id) => {
-                    setSelectedLocationId(id)
-                    setSelectedDate(null)
-                    setClasses([])
-                  }}
-                  disabled={locations.length === 0}
-                />
-
-                {loadingPrograms ? (
-                  <div className="flex justify-center py-4">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-bold text-primary">Classes</h1>
+                    <div className="mt-1 h-1 w-16 rounded-full bg-primary" />
                   </div>
-                ) : (
-                  <TrainingProgramFilter
-                    programs={trainingPrograms}
-                    selectedIds={selectedProgramIds}
-                    onChange={setSelectedProgramIds}
-                    disabled={!selectedLocationId}
-                  />
-                )}
+                </div>
 
                 <DateCalendar
                   selectedDate={selectedDate}
@@ -458,8 +471,75 @@ export function BookingWidget() {
                   classDates={classDates}
                 />
 
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShowAll}
+                    className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                      selectedProgramIds.length === 0
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border bg-card text-muted-foreground hover:border-primary/40'
+                    }`}
+                  >
+                    Show all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToday}
+                    className="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/40"
+                  >
+                    Today
+                  </button>
+
+                  <LocationSelect
+                    locations={locations}
+                    value={selectedLocationId}
+                    onValueChange={(id) => {
+                      setSelectedLocationId(id)
+                      setSelectedDate(null)
+                      setClasses([])
+                    }}
+                    disabled={locations.length === 0}
+                    variant="inline"
+                  />
+                </div>
+
+                {trainingPrograms.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {loadingPrograms ? (
+                      <div className="flex justify-center py-2">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      </div>
+                    ) : (
+                      <>
+                        {trainingPrograms.map((program) => {
+                          const isSelected = selectedProgramIds.includes(program.id)
+                          return (
+                            <button
+                              key={program.id}
+                              type="button"
+                              onClick={() =>
+                                setSelectedProgramIds(
+                                  isSelected ? [] : [program.id],
+                                )
+                              }
+                              className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                                isSelected
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-card text-muted-foreground hover:border-primary/40'
+                              }`}
+                            >
+                              {program.name}
+                            </button>
+                          )
+                        })}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {selectedDate && loading && fetchedClasses.length === 0 && (
-                  <div className="flex justify-center py-4">
+                  <div className="flex justify-center py-8">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>
                 )}
@@ -468,7 +548,8 @@ export function BookingWidget() {
                   <ClassList
                     date={selectedDate}
                     classes={classes}
-                    onClassSelect={handleClassSelect}
+                    locationName={selectedLocation?.name}
+                    gymId={gym?.id}
                   />
                 )}
               </>

@@ -18,3 +18,10 @@ export interface TrainingProgram {
   raw: Record<string, unknown>
 }
 
+export interface Gym {
+  id: string
+  businessName: string
+  domain?: string
+  raw: Record<string, unknown>
+}
+

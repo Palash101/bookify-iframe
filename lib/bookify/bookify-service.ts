@@ -76,6 +76,10 @@ export class BookifyService {
     })
   }
 
+  async getGym(): Promise<ApiResponse<unknown>> {
+    return this.get(API_ENDPOINTS.GYM)
+  }
+
   async getLocations(): Promise<ApiResponse<unknown[]>> {
     return this.get('/locations')
   }

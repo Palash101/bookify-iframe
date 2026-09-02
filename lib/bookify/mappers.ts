@@ -1,5 +1,10 @@
 import type { ClassDetailsType, GymClass, Seat } from '@/components/booking/booking-widget'
-import type { ApiResponse, Location, TrainingProgram } from './types'
+import type {
+  ApiResponse,
+  Gym,
+  Location,
+  TrainingProgram,
+} from './types'
 
 function pickId(item: Record<string, unknown>): string {
   const id = item.id ?? item._id ?? item.location_id ?? item.program_id
@@ -26,6 +31,39 @@ export function mapLocation(item: Record<string, unknown>): Location | null {
   const id = pickId(item)
   if (!id) return null
   return { id, name: pickName(item), raw: item }
+}
+
+export function mapGym(item: Record<string, unknown>): Gym | null {
+  const id = item.id != null ? String(item.id) : ''
+  if (!id) return null
+
+  return {
+    id,
+    businessName: String(item.business_name ?? item.businessName ?? 'Studio'),
+    domain:
+      item.domain != null ? String(item.domain) : undefined,
+    raw: item,
+  }
+}
+
+export function unwrapRecord(response: ApiResponse<unknown>): Record<string, unknown> {
+  if (!response || typeof response !== 'object' || Array.isArray(response)) {
+    return {}
+  }
+
+  const data = response.data
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    return data as Record<string, unknown>
+  }
+
+  const record = response as Record<string, unknown>
+  const rest = { ...record }
+  delete rest.data
+  delete rest.message
+  delete rest.success
+  delete rest.error
+
+  return rest
 }
 
 export function mapTrainingProgram(item: Record<string, unknown>): TrainingProgram | null {
@@ -101,21 +139,72 @@ function pickCategory(item: Record<string, unknown>): string {
   return category != null ? String(category).toLowerCase() : 'fitness'
 }
 
+const DEFAULT_CLASS_IMAGE =
+  'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=300&fit=crop'
+
 function pickImage(item: Record<string, unknown>): string {
   const image = item.image ?? item.image_url ?? item.thumbnail ?? item.cover_image
   if (typeof image === 'string' && image) return image
-  return 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=400&h=300&fit=crop'
+  return DEFAULT_CLASS_IMAGE
+}
+
+function pickTrainerImage(item: Record<string, unknown>): string {
+  const trainer =
+    item.trainer && typeof item.trainer === 'object'
+      ? (item.trainer as Record<string, unknown>)
+      : undefined
+
+  const image =
+    item.trainer_image ??
+    item.trainerImage ??
+    trainer?.image ??
+    trainer?.image_url ??
+    trainer?.profile_image
+
+  if (typeof image === 'string' && image) return image
+  return pickImage(item)
+}
+
+function pickLocationName(item: Record<string, unknown>): string | undefined {
+  const location =
+    item.location && typeof item.location === 'object'
+      ? (item.location as Record<string, unknown>)
+      : undefined
+
+  const name =
+    item.location_name ??
+    item.locationName ??
+    location?.name ??
+    location?.title
+
+  return name != null ? String(name) : undefined
 }
 
 function buildDescription(item: Record<string, unknown>): string {
+  const explicit =
+    item.description ??
+    item.class_description ??
+    item.classDescription ??
+    item.about
+
+  if (explicit != null && String(explicit).trim()) {
+    return String(explicit).trim()
+  }
+
   const parts: string[] = []
   if (item.theme_name) parts.push(String(item.theme_name))
-  if (item.gender) parts.push(String(item.gender))
   if (item.booking_type === 'price' && item.price) {
     parts.push(`$${item.price}`)
   }
-  if (item.status) parts.push(String(item.status))
   return parts.join(' · ') || 'Gym class session'
+}
+
+export function formatGenderLabel(gender?: string | null): string | null {
+  if (!gender) return null
+  const normalized = gender.trim().toLowerCase()
+  if (normalized === 'female' || normalized === 'f') return 'Female Only'
+  if (normalized === 'male' || normalized === 'm') return 'Male Only'
+  return null
 }
 
 export function getClassStartDate(item: Record<string, unknown>): Date | null {
@@ -167,6 +256,8 @@ export function mapBookifyClass(item: Record<string, unknown>): GymClass | null 
     category: pickCategory(item),
     description: buildDescription(item),
     image: pickImage(item),
+    trainerImage: pickTrainerImage(item),
+    locationName: pickLocationName(item),
     trainingProgramId: pickTrainingProgramId(item),
     startDate:
       normalizedClassDate ??
