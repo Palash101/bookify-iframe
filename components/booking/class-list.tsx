@@ -12,6 +12,7 @@ interface ClassListProps {
   classes: GymClass[]
   locationName?: string
   gymId?: string
+  locationId?: string
 }
 
 function formatFullDate(d: Date) {
@@ -47,6 +48,7 @@ export function ClassList({
   classes,
   locationName,
   gymId,
+  locationId,
 }: ClassListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
@@ -195,13 +197,15 @@ export function ClassList({
                   )}
                   <a
                     href={
-                      gymId ? buildClassDetailsUrl(gymId, gymClass.id) : '#'
+                      gymId && locationId
+                        ? buildClassDetailsUrl(gymId, locationId, gymClass.id)
+                        : '#'
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-disabled={!gymId}
+                    aria-disabled={!gymId || !locationId}
                     className={`rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 ${
-                      !gymId
+                      !gymId || !locationId
                         ? 'pointer-events-none cursor-not-allowed opacity-50'
                         : ''
                     }`}

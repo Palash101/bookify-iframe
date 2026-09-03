@@ -550,6 +550,7 @@ export function BookingWidget() {
                     classes={classes}
                     locationName={selectedLocation?.name}
                     gymId={gym?.id}
+                    locationId={selectedLocationId}
                   />
                 )}
               </>
