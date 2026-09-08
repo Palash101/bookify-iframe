@@ -141,7 +141,7 @@ export function ClassList({
               }`}
             >
               <div className="flex flex-col sm:flex-row">
-                <div className="relative h-48 w-full shrink-0 sm:h-auto sm:w-44 md:w-52">
+                <div className="relative h-36 w-full shrink-0 sm:h-auto sm:w-36 md:w-40">
                   <Image
                     src={trainerImage}
                     alt={gymClass.instructor}
@@ -152,7 +152,7 @@ export function ClassList({
                   />
                 </div>
 
-                <div className="flex min-w-0 flex-1 flex-col p-4 sm:p-5">
+                <div className="flex min-w-0 flex-1 flex-col p-3.5 sm:p-4">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                     Class
                   </span>
@@ -198,7 +198,7 @@ export function ClassList({
                     </p>
                   )}
 
-                  <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+                  <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 shrink-0 text-primary/70" />
                       <span>{formatFullDate(date)}</span>
@@ -219,7 +219,7 @@ export function ClassList({
                     )}
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-secondary/40 px-4 py-3">
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-secondary/40 px-3.5 py-2.5">
                     <span className="text-sm text-muted-foreground">
                       {isDisabled ? 'Fully booked' : 'Available to book'}
                     </span>
