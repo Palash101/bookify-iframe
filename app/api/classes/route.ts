@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { bookifyFetch } from '@/lib/bookify/api-client'
+import { isOriginAllowed } from '@/lib/embed-origins'
 import { mapBookifyClass, unwrapList } from '@/lib/bookify/mappers'
 
 function withCors(response: NextResponse) {
@@ -7,7 +8,7 @@ function withCors(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Methods', 'GET, OPTIONS')
   response.headers.set(
     'Access-Control-Allow-Headers',
-    'Content-Type, X-Tenant-Key',
+    'Content-Type, X-Tenant-Key, X-Embed-Origin, X-Origin',
   )
   return response
 }
@@ -16,22 +17,54 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const date = searchParams.get('date')
   const locationId = searchParams.get('locationId')
-  const days = searchParams.get('days') ?? '10'
-  const sort_order = searchParams.get('sort_order') ?? 'asc'
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1'))
+  const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit') ?? '20')))
 
-  if (!date) {
+  if (!locationId) {
     return withCors(
-      NextResponse.json({ error: 'Date parameter is required' }, { status: 400 }),
+      NextResponse.json({ error: 'locationId parameter is required' }, { status: 400 }),
     )
   }
 
-  const queryString = `days=${days}&sort_order=${sort_order}`
-  const path = locationId
-    ? `/locations/${locationId}/classes?${queryString}`
-    : `/classes?${queryString}`
+  if (!date) {
+    return withCors(
+      NextResponse.json({ error: 'date parameter is required' }, { status: 400 }),
+    )
+  }
+
+  const embedOrigin =
+    request.headers.get('X-Embed-Origin') ??
+    request.headers.get('X-Origin') ??
+    request.headers.get('origin')
+
+  if (embedOrigin && !isOriginAllowed(embedOrigin)) {
+    return withCors(
+      NextResponse.json({ error: 'Embed origin not allowed' }, { status: 403 }),
+    )
+  }
+
+  const headers: Record<string, string> = {}
+  if (embedOrigin) {
+    headers.Origin = embedOrigin
+    headers.Referer = `${embedOrigin}/`
+    headers['X-Embed-Origin'] = embedOrigin
+    headers['X-Origin'] = embedOrigin
+  }
+
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+    date,
+  })
 
   try {
-    const { data, ok, status } = await bookifyFetch(path, { method: 'GET' })
+    const { data, ok, status } = await bookifyFetch(
+      `/locations/${locationId}/classes?${query.toString()}`,
+      {
+        method: 'GET',
+        headers,
+      },
+    )
 
     if (!ok) {
       return withCors(
@@ -47,17 +80,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const mapped = unwrapList(data as Record<string, unknown>)
+    const classes = unwrapList(data as Record<string, unknown>)
       .map(mapBookifyClass)
-      .filter((item) => item != null)
-      .filter((gymClass) => {
-        if (!gymClass.startDate) return true
-        const classDate = new Date(gymClass.startDate)
-        const selected = new Date(date)
-        return classDate.toDateString() === selected.toDateString()
-      })
+      .filter((item): item is NonNullable<ReturnType<typeof mapBookifyClass>> => item != null)
 
-    return withCors(NextResponse.json({ classes: mapped, date }))
+    return withCors(
+      NextResponse.json({
+        classes,
+        page,
+        limit,
+        date,
+        hasMore: classes.length >= limit,
+      }),
+    )
   } catch (error) {
     return withCors(
       NextResponse.json(

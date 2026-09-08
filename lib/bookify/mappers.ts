@@ -1,10 +1,5 @@
-import type { ClassDetailsType, GymClass, Seat } from '@/components/booking/booking-widget'
-import type {
-  ApiResponse,
-  Gym,
-  Location,
-  TrainingProgram,
-} from './types'
+import type { GymClass } from '@/components/booking/booking-widget'
+import type { ApiResponse, Location } from './types'
 
 function pickId(item: Record<string, unknown>): string {
   const id = item.id ?? item._id ?? item.location_id ?? item.program_id
@@ -24,6 +19,7 @@ function pickName(item: Record<string, unknown>): string {
     item.program_name ??
     item.training_programme_name ??
     item.label
+
   return name != null ? String(name) : 'Unnamed'
 }
 
@@ -33,64 +29,6 @@ export function mapLocation(item: Record<string, unknown>): Location | null {
   return { id, name: pickName(item), raw: item }
 }
 
-export function mapGym(item: Record<string, unknown>): Gym | null {
-  const id = item.id != null ? String(item.id) : ''
-  if (!id) return null
-
-  return {
-    id,
-    businessName: String(item.business_name ?? item.businessName ?? 'Studio'),
-    domain:
-      item.domain != null ? String(item.domain) : undefined,
-    raw: item,
-  }
-}
-
-export function unwrapRecord(response: ApiResponse<unknown>): Record<string, unknown> {
-  if (!response || typeof response !== 'object' || Array.isArray(response)) {
-    return {}
-  }
-
-  const data = response.data
-  if (data && typeof data === 'object' && !Array.isArray(data)) {
-    return data as Record<string, unknown>
-  }
-
-  const record = response as Record<string, unknown>
-  const rest = { ...record }
-  delete rest.data
-  delete rest.message
-  delete rest.success
-  delete rest.error
-
-  return rest
-}
-
-export function mapTrainingProgram(item: Record<string, unknown>): TrainingProgram | null {
-  const id = pickTrainingProgramId(item) ?? pickId(item)
-  if (!id) return null
-  return { id, name: pickName(item), raw: item }
-}
-
-export function pickTrainingProgramId(item: Record<string, unknown>): string | undefined {
-  const program =
-    item.program && typeof item.program === 'object'
-      ? (item.program as Record<string, unknown>)
-      : undefined
-
-  const id =
-    item.training_programme_id ??
-    item.training_program_id ??
-    item.trainingProgramId ??
-    item.program_id ??
-    item.programId ??
-    program?.id ??
-    program?.program_id
-
-  return id != null ? String(id) : undefined
-}
-
-/** Normalize API date values to YYYY-MM-DD for reliable comparisons. */
 export function normalizeDateKey(value: string | undefined | null): string | null {
   if (!value) return null
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
@@ -119,12 +57,15 @@ function formatDurationFromTimes(start: string, end: string): string {
     const [h, m] = t.split(':').map(Number)
     return h * 60 + (m || 0)
   }
+
   let startM = toMinutes(start)
   let endM = toMinutes(end)
   if (endM < startM) endM += 24 * 60
+
   const diff = Math.max(endM - startM, 0)
   const hours = Math.floor(diff / 60)
   const mins = diff % 60
+
   if (hours && mins) return `${hours}h ${mins}m`
   if (hours) return `${hours}h`
   return `${mins} min`
@@ -136,6 +77,7 @@ function pickCategory(item: Record<string, unknown>): string {
     item.category ??
     item.class_type ??
     item.type
+
   return category != null ? String(category).toLowerCase() : 'fitness'
 }
 
@@ -196,7 +138,7 @@ function buildDescription(item: Record<string, unknown>): string {
   if (item.booking_type === 'price' && item.price) {
     parts.push(`$${item.price}`)
   }
-  return parts.join(' · ') || 'Gym class session'
+  return parts.join(' | ') || 'Gym class session'
 }
 
 export function formatGenderLabel(gender?: string | null): string | null {
@@ -205,27 +147,6 @@ export function formatGenderLabel(gender?: string | null): string | null {
   if (normalized === 'female' || normalized === 'f') return 'Female Only'
   if (normalized === 'male' || normalized === 'm') return 'Male Only'
   return null
-}
-
-export function getClassStartDate(item: Record<string, unknown>): Date | null {
-  const classDate = item.class_date ?? item.classDate
-  if (classDate) {
-    const [year, month, day] = String(classDate).split('-').map(Number)
-    if (year && month && day) {
-      return new Date(year, month - 1, day)
-    }
-  }
-
-  const raw =
-    item.start_date ??
-    item.startDate ??
-    item.date ??
-    item.starts_at ??
-    item.scheduled_at
-
-  if (raw == null) return null
-  const date = new Date(String(raw))
-  return Number.isNaN(date.getTime()) ? null : date
 }
 
 export function mapBookifyClass(item: Record<string, unknown>): GymClass | null {
@@ -258,11 +179,7 @@ export function mapBookifyClass(item: Record<string, unknown>): GymClass | null 
     image: pickImage(item),
     trainerImage: pickTrainerImage(item),
     locationName: pickLocationName(item),
-    trainingProgramId: pickTrainingProgramId(item),
-    startDate:
-      normalizedClassDate ??
-      normalizeDateKey(getClassStartDate(item)?.toISOString()) ??
-      undefined,
+    startDate: normalizedClassDate ?? undefined,
     classDate: normalizedClassDate ?? classDate,
     endTime: endTime || undefined,
     price: item.price != null ? String(item.price) : undefined,
@@ -271,74 +188,7 @@ export function mapBookifyClass(item: Record<string, unknown>): GymClass | null 
     bookingType: item.booking_type != null ? String(item.booking_type) : undefined,
     fullyBooked: Boolean(item.fully_booked),
     status: item.status != null ? String(item.status) : undefined,
-    layoutId: item.layout_id != null ? String(item.layout_id) : undefined,
     raw: item,
-  }
-}
-
-function mapApiSeatStatus(status: unknown): Seat['status'] {
-  if (status === 'available') return 'available'
-  if (status === 'booked' || status === 'occupied' || status === 'unavailable') {
-    return 'booked'
-  }
-  return 'booked'
-}
-
-function mapLayoutSeats(item: Record<string, unknown>, capacity: number, classId: string): Seat[] {
-  const layouts = item.layouts as { seats?: Array<Record<string, unknown>> } | undefined
-  const apiSeats = layouts?.seats ?? []
-
-  if (apiSeats.length === 0) {
-    return generateSeats(capacity, classId)
-  }
-
-  return apiSeats.map((seat, index) => ({
-    id: String(seat.id ?? `seat-${index}`),
-    label: String(seat.text ?? seat.id ?? `${index + 1}`),
-    row: index,
-    column: 0,
-    status: mapApiSeatStatus(seat.status),
-    x: typeof seat.x === 'number' ? seat.x : undefined,
-    y: typeof seat.y === 'number' ? seat.y : undefined,
-    shape: seat.style != null ? String(seat.style) : undefined,
-  }))
-}
-
-function generateSeats(capacity: number, classId: string): Seat[] {
-  const rows = Math.ceil(Math.max(capacity, 1) / 5)
-  const seats: Seat[] = []
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < 5; col++) {
-      const seatNumber = row * 5 + col + 1
-      if (seatNumber <= capacity) {
-        seats.push({
-          id: `seat-${seatNumber}`,
-          row: row + 1,
-          column: col + 1,
-          label: `${String.fromCharCode(65 + row)}${col + 1}`,
-          status: 'available',
-        })
-      }
-    }
-  }
-
-  return seats.length > 0 ? seats : [{ id: 'seat-1', row: 1, column: 1, label: 'A1', status: 'available' }]
-}
-
-export function toClassDetails(gymClass: GymClass): ClassDetailsType {
-  const raw = gymClass.raw ?? {}
-  const benefits: string[] = []
-  if (gymClass.themeName) benefits.push(gymClass.themeName)
-  if (gymClass.gender) benefits.push(`${gymClass.gender} session`)
-  if (gymClass.price) benefits.push(`Price: $${gymClass.price}`)
-
-  return {
-    ...gymClass,
-    seats: mapLayoutSeats(raw, gymClass.capacity, gymClass.id),
-    equipment: gymClass.themeName ? [gymClass.themeName] : [],
-    level: gymClass.gender ? String(gymClass.gender) : 'All Levels',
-    benefits: benefits.length > 0 ? benefits : ['Book your spot'],
   }
 }
 

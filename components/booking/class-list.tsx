@@ -1,19 +1,22 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import Image from 'next/image'
 import { Calendar, Clock, MapPin } from 'lucide-react'
 import { formatGenderLabel } from '@/lib/bookify/mappers'
-import { buildClassDetailsUrl } from '@/lib/bookify/config'
 import type { GymClass } from './booking-widget'
 
 interface ClassListProps {
   date: Date
   classes: GymClass[]
   locationName?: string
-  gymId?: string
+  orgId?: string
   locationId?: string
+  isLoading?: boolean
+  isLoadingMore?: boolean
 }
+
+const BOOKING_BASE_URL = 'http://localhost:3002'
 
 function formatFullDate(d: Date) {
   return d.toLocaleDateString('en-US', {
@@ -43,12 +46,24 @@ function formatClockTime(value: string) {
   return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
 }
 
+function buildDateTimeForClass(date: Date, value?: string) {
+  if (!value) return null
+  const parts = value.split(':').map(Number)
+  if (parts.length < 2 || parts.some(Number.isNaN)) return null
+
+  const next = new Date(date)
+  next.setHours(parts[0], parts[1], 0, 0)
+  return next
+}
+
 export function ClassList({
   date,
   classes,
   locationName,
-  gymId,
+  orgId,
   locationId,
+  isLoading = false,
+  isLoadingMore = false,
 }: ClassListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
@@ -70,6 +85,14 @@ export function ClassList({
     )
   })()
 
+  const isUpcomingDate = (() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const selected = new Date(date)
+    selected.setHours(0, 0, 0, 0)
+    return selected.getTime() >= today.getTime()
+  })()
+
   return (
     <div className="space-y-4">
       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -82,10 +105,33 @@ export function ClassList({
             gymClass.fullyBooked || gymClass.enrolled >= gymClass.capacity
           const trainerImage = gymClass.trainerImage ?? gymClass.image
           const isExpanded = expandedIds.has(gymClass.id)
-          const showMore =
-            gymClass.description.length > 120 && !isExpanded
+          const showMore = gymClass.description.length > 120 && !isExpanded
           const displayLocation = gymClass.locationName ?? locationName
           const genderLabel = formatGenderLabel(gymClass.gender)
+          const rawStartTime =
+            typeof gymClass.raw?.start_time === 'string'
+              ? gymClass.raw.start_time
+              : typeof gymClass.raw?.startTime === 'string'
+                ? gymClass.raw.startTime
+                : undefined
+          const rawEndTime =
+            typeof gymClass.raw?.end_time === 'string'
+              ? gymClass.raw.end_time
+              : typeof gymClass.raw?.endTime === 'string'
+                ? gymClass.raw.endTime
+                : undefined
+          const classCutoffTime = buildDateTimeForClass(
+            date,
+            gymClass.endTime ?? rawEndTime ?? rawStartTime,
+          )
+          const isPastTodayClass =
+            isToday &&
+            classCutoffTime != null &&
+            classCutoffTime.getTime() <= Date.now()
+          const bookingUrl =
+            orgId && locationId
+              ? `${BOOKING_BASE_URL}/${orgId}/${locationId}/class-details/${gymClass.id}`
+              : null
 
           return (
             <article
@@ -121,16 +167,6 @@ export function ClassList({
                   )}
 
                   <div className="mt-2 flex items-center gap-2">
-                    {/* <div className="relative h-7 w-7 overflow-hidden rounded-full bg-muted">
-                      <Image
-                        src={trainerImage}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="28px"
-                        unoptimized
-                      />
-                    </div> */}
                     <span className="text-sm text-muted-foreground">
                       {gymClass.instructor}
                     </span>
@@ -140,7 +176,7 @@ export function ClassList({
                     <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                       {isExpanded || !showMore
                         ? gymClass.description
-                        : `${gymClass.description.slice(0, 120)}…`}
+                        : `${gymClass.description.slice(0, 120)}...`}
                       {showMore && (
                         <button
                           type="button"
@@ -171,9 +207,8 @@ export function ClassList({
                       <Clock className="h-4 w-4 shrink-0 text-primary/70" />
                       <span>
                         {gymClass.time}
-                        {gymClass.endTime &&
-                          ` - ${formatClockTime(gymClass.endTime)}`}
-                        {gymClass.duration !== '—' && ` • ${gymClass.duration}`}
+                        {gymClass.endTime && ` - ${formatClockTime(gymClass.endTime)}`}
+                        {gymClass.duration !== '-' && ` • ${gymClass.duration}`}
                       </span>
                     </div>
                     {displayLocation && (
@@ -183,35 +218,29 @@ export function ClassList({
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="flex flex-row items-center justify-between gap-4 border-t border-border p-4 sm:w-44 sm:flex-col sm:justify-center sm:border-l sm:border-t-0 sm:p-5">
-                  {gymClass.price && gymClass.bookingType === 'price' ? (
-                    <p className="text-2xl font-bold text-foreground">
-                      {formatPrice(gymClass.price)}
-                    </p>
-                  ) : (
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {isDisabled ? 'Fully booked' : 'Free booking'}
-                    </p>
-                  )}
-                  <a
-                    href={
-                      gymId && locationId
-                        ? buildClassDetailsUrl(gymId, locationId, gymClass.id)
-                        : '#'
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-disabled={!gymId || !locationId}
-                    className={`rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 ${
-                      !gymId || !locationId
-                        ? 'pointer-events-none cursor-not-allowed opacity-50'
-                        : ''
-                    }`}
-                  >
-                    Book now
-                  </a>
+                  <div className="mt-4 flex items-center justify-between gap-4 rounded-xl bg-secondary/40 px-4 py-3">
+                    <span className="text-sm text-muted-foreground">
+                      {isDisabled ? 'Fully booked' : 'Available to book'}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {gymClass.price && gymClass.bookingType === 'price' ? (
+                        <span className="text-lg font-bold text-foreground">
+                          {formatPrice(gymClass.price)}
+                        </span>
+                      ) : null}
+                      {isUpcomingDate && !isPastTodayClass && !isDisabled && bookingUrl ? (
+                        <a
+                          href={bookingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                        >
+                          Book now
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
                 </div>
               </div>
             </article>
@@ -219,9 +248,21 @@ export function ClassList({
         })}
       </div>
 
-      {classes.length === 0 && (
+      {isLoading && (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
+          <div className="h-7 w-7 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      )}
+
+      {classes.length === 0 && !isLoading && !isLoadingMore && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
           <p className="text-muted-foreground">No classes available for this date</p>
+        </div>
+      )}
+
+      {isLoadingMore && (
+        <div className="flex justify-center py-4">
+          <div className="h-7 w-7 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       )}
     </div>

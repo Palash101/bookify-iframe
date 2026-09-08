@@ -17,7 +17,6 @@ async function parseJsonResponse<T>(res: Response): Promise<T> {
 }
 
 export class BookifyService {
-  /** Proxied through Next.js so the upstream API gets the parent site's Origin header. */
   private baseUrl = CLIENT_API_PROXY
 
   private normalizePath(path: string): string {
@@ -69,54 +68,12 @@ export class BookifyService {
     return this.request<T>(path, { method: 'GET' })
   }
 
-  private post<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
-    return this.request<T>(path, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    })
-  }
-
   async getGym(): Promise<ApiResponse<unknown>> {
     return this.get(API_ENDPOINTS.GYM)
   }
 
   async getLocations(): Promise<ApiResponse<unknown[]>> {
-    return this.get('/locations')
-  }
-
-  async getTrainingPrograms(
-    locationId?: string,
-  ): Promise<ApiResponse<unknown[]>> {
-    if (locationId) {
-      return this.get(`/locations/${locationId}/training-programs`)
-    }
-    return this.get(API_ENDPOINTS.TRAINING_PROGRAM.LIST)
-  }
-
-  async getClasses(
-    params: { days: number; sort_order: string; class_date?: string },
-    locationId?: string,
-  ): Promise<ApiResponse<unknown[]>> {
-    const query = new URLSearchParams({
-      days: String(params.days),
-      sort_order: params.sort_order,
-    })
-    if (params.class_date) {
-      query.set('class_date', params.class_date)
-    }
-    const queryString = query.toString()
-    if (locationId) {
-      return this.get(`/locations/${locationId}/classes?${queryString}`)
-    }
-    return this.get(`/classes?${queryString}`)
-  }
-
-  async createBooking(payload: {
-    classId: string
-    seatId: string
-    user: { name: string; email: string; phone: string }
-  }): Promise<ApiResponse<unknown>> {
-    return this.post(API_ENDPOINTS.BOOKING.CREATE, payload)
+    return this.get(API_ENDPOINTS.LOCATIONS)
   }
 }
 
