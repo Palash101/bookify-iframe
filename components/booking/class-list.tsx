@@ -20,6 +20,7 @@ interface ClassListProps {
 }
 
 // const BOOKING_BASE_URL = 'http://localhost:3001'
+
 const BOOKING_BASE_URL = 'https://www.fitnezstudios.com/'
 
 function formatFullDate(d: Date) {
