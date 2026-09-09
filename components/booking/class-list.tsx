@@ -1,8 +1,9 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import Image from 'next/image'
-import { Calendar, Clock, MapPin } from 'lucide-react'
+import { Calendar, Clock, Info, MapPin } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { formatGenderLabel } from '@/lib/bookify/mappers'
 import type { GymClass } from './booking-widget'
 
@@ -14,9 +15,13 @@ interface ClassListProps {
   locationId?: string
   isLoading?: boolean
   isLoadingMore?: boolean
+  children?: ReactNode
+  onScrollRootChange?: (node: HTMLDivElement | null) => void
 }
 
-const BOOKING_BASE_URL = 'http://localhost:3002'
+// const BOOKING_BASE_URL = 'http://localhost:3001'
+
+const BOOKING_BASE_URL = 'https://www.fitnezstudios.com/'
 
 function formatFullDate(d: Date) {
   return d.toLocaleDateString('en-US', {
@@ -48,6 +53,19 @@ function formatClockTime(value: string) {
 
 function buildDateTimeForClass(date: Date, value?: string) {
   if (!value) return null
+
+  const match12 = value.trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i)
+  if (match12) {
+    let hours = Number(match12[1])
+    const minutes = Number(match12[2])
+    const period = match12[3].toUpperCase()
+    if (period === 'PM' && hours !== 12) hours += 12
+    if (period === 'AM' && hours === 12) hours = 0
+    const next = new Date(date)
+    next.setHours(hours, minutes, 0, 0)
+    return next
+  }
+
   const parts = value.split(':').map(Number)
   if (parts.length < 2 || parts.some(Number.isNaN)) return null
 
@@ -55,6 +73,32 @@ function buildDateTimeForClass(date: Date, value?: string) {
   next.setHours(parts[0], parts[1], 0, 0)
   return next
 }
+
+function getClassStartDateTime(gymClass: GymClass, selectedDate: Date) {
+  const raw = gymClass.raw
+  const candidates = [
+    gymClass.startTime,
+    typeof raw?.start_time === 'string' ? raw.start_time : undefined,
+    typeof raw?.startTime === 'string' ? raw.startTime : undefined,
+    gymClass.time,
+  ]
+
+  for (const value of candidates) {
+    const start = buildDateTimeForClass(selectedDate, value)
+    if (start) return start
+  }
+
+  return null
+}
+
+function hasClassAlreadyStarted(gymClass: GymClass, selectedDate: Date) {
+  const start = getClassStartDateTime(gymClass, selectedDate)
+  if (!start) return false
+  return start.getTime() <= Date.now()
+}
+
+const CLASS_STARTED_MESSAGE =
+  'This class has already started. Booking is no longer available.'
 
 export function ClassList({
   date,
@@ -64,8 +108,16 @@ export function ClassList({
   locationId,
   isLoading = false,
   isLoadingMore = false,
+  children,
+  onScrollRootChange,
 }: ClassListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    onScrollRootChange?.(listRef.current)
+    return () => onScrollRootChange?.(null)
+  }, [onScrollRootChange])
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
@@ -73,6 +125,17 @@ export function ClassList({
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
+    })
+  }
+
+  const handleBookNow = (
+    event: MouseEvent<HTMLAnchorElement>,
+    gymClass: GymClass,
+  ) => {
+    if (!hasClassAlreadyStarted(gymClass, date)) return
+    event.preventDefault()
+    toast(CLASS_STARTED_MESSAGE, {
+      icon: <Info className="h-5 w-5 text-primary" />,
     })
   }
 
@@ -85,21 +148,17 @@ export function ClassList({
     )
   })()
 
-  const isUpcomingDate = (() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const selected = new Date(date)
-    selected.setHours(0, 0, 0, 0)
-    return selected.getTime() >= today.getTime()
-  })()
-
   return (
-    <div className="space-y-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="flex min-h-0 flex-col gap-4">
+      <h3 className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {isToday ? 'Today' : formatFullDate(date)}
       </h3>
 
-      <div className="space-y-4">
+      <div
+        ref={listRef}
+        className="no-scrollbar space-y-4 overflow-y-auto overscroll-contain"
+        style={{ height: 'var(--class-list-height)' }}
+      >
         {classes.map((gymClass) => {
           const isDisabled =
             gymClass.fullyBooked || gymClass.enrolled >= gymClass.capacity
@@ -108,26 +167,6 @@ export function ClassList({
           const showMore = gymClass.description.length > 120 && !isExpanded
           const displayLocation = gymClass.locationName ?? locationName
           const genderLabel = formatGenderLabel(gymClass.gender)
-          const rawStartTime =
-            typeof gymClass.raw?.start_time === 'string'
-              ? gymClass.raw.start_time
-              : typeof gymClass.raw?.startTime === 'string'
-                ? gymClass.raw.startTime
-                : undefined
-          const rawEndTime =
-            typeof gymClass.raw?.end_time === 'string'
-              ? gymClass.raw.end_time
-              : typeof gymClass.raw?.endTime === 'string'
-                ? gymClass.raw.endTime
-                : undefined
-          const classCutoffTime = buildDateTimeForClass(
-            date,
-            gymClass.endTime ?? rawEndTime ?? rawStartTime,
-          )
-          const isPastTodayClass =
-            isToday &&
-            classCutoffTime != null &&
-            classCutoffTime.getTime() <= Date.now()
           const bookingUrl =
             orgId && locationId
               ? `${BOOKING_BASE_URL}/${orgId}/${locationId}/class-details/${gymClass.id}`
@@ -229,11 +268,13 @@ export function ClassList({
                           {formatPrice(gymClass.price)}
                         </span>
                       ) : null}
-                      {isUpcomingDate && !isPastTodayClass && !isDisabled && bookingUrl ? (
+                      {!isDisabled && bookingUrl ? (
                         <a
                           href={bookingUrl}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(event) => handleBookNow(event, gymClass)}
+                          onAuxClick={(event) => handleBookNow(event, gymClass)}
                           className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                         >
                           Book now
@@ -246,25 +287,27 @@ export function ClassList({
             </article>
           )
         })}
+
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
+            <div className="h-7 w-7 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+        )}
+
+        {classes.length === 0 && !isLoading && !isLoadingMore && (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
+            <p className="text-muted-foreground">No classes available for this date</p>
+          </div>
+        )}
+
+        {isLoadingMore && (
+          <div className="flex justify-center py-4">
+            <div className="h-7 w-7 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          </div>
+        )}
+
+        {children}
       </div>
-
-      {isLoading && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
-          <div className="h-7 w-7 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      )}
-
-      {classes.length === 0 && !isLoading && !isLoadingMore && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border py-16">
-          <p className="text-muted-foreground">No classes available for this date</p>
-        </div>
-      )}
-
-      {isLoadingMore && (
-        <div className="flex justify-center py-4">
-          <div className="h-7 w-7 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
-      )}
     </div>
   )
 }

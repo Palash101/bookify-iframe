@@ -13,6 +13,7 @@ export interface GymClass {
   name: string
   instructor: string
   time: string
+  startTime?: string
   duration: string
   capacity: number
   enrolled: number
@@ -112,6 +113,7 @@ export function BookingWidget() {
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const isFetchingNextPageRef = useRef(false)
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -255,12 +257,12 @@ export function BookingWidget() {
         isFetchingNextPageRef.current = true
         void fetchClasses(page + 1, false)
       },
-      { rootMargin: '240px 0px' },
+      { root: scrollRoot ?? undefined, rootMargin: '240px 0px' },
     )
 
     observer.observe(node)
     return () => observer.disconnect()
-  }, [fetchClasses, hasMore, loadingClasses, loadingMore, page, ready])
+  }, [fetchClasses, hasMore, loadingClasses, loadingMore, page, ready, scrollRoot])
 
   const handleDateSelect = (date: Date) => {
     const normalized = new Date(date)
@@ -274,10 +276,10 @@ export function BookingWidget() {
   const showInitialLoader = !ready || loadingLocations
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
+      <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col overflow-hidden px-4 py-6">
         {error && (
-          <div className="mb-4 rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="mb-4 shrink-0 rounded-xl bg-destructive/10 p-4 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -288,38 +290,40 @@ export function BookingWidget() {
             <p className="text-sm text-muted-foreground">Loading classes...</p>
           </div>
         ) : (
-          <div className="space-y-5">
-            <div>
-              <h1 className="text-2xl font-bold text-primary">Classes</h1>
-              <div className="mt-1 h-1 w-16 rounded-full bg-primary" />
-            </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden">
+            <div className="shrink-0 space-y-5">
+              <div>
+                <h1 className="text-2xl font-bold text-primary">Classes</h1>
+                <div className="mt-1 h-1 w-16 rounded-full bg-primary" />
+              </div>
 
-            <DateCalendar
-              selectedDate={selectedDate}
-              onDateSelect={handleDateSelect}
-            />
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleDateSelect(getToday())}
-                className="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/40"
-              >
-                Today
-              </button>
-
-              <LocationSelect
-                locations={locations}
-                value={selectedLocationId}
-                onValueChange={(id) => {
-                  setSelectedLocationId(id)
-                  setPage(1)
-                  setHasMore(false)
-                  setClasses([])
-                }}
-                disabled={locations.length === 0}
-                variant="inline"
+              <DateCalendar
+                selectedDate={selectedDate}
+                onDateSelect={handleDateSelect}
               />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleDateSelect(getToday())}
+                  className="rounded-full border border-border bg-card px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/40"
+                >
+                  Today
+                </button>
+
+                <LocationSelect
+                  locations={locations}
+                  value={selectedLocationId}
+                  onValueChange={(id) => {
+                    setSelectedLocationId(id)
+                    setPage(1)
+                    setHasMore(false)
+                    setClasses([])
+                  }}
+                  disabled={locations.length === 0}
+                  variant="inline"
+                />
+              </div>
             </div>
 
             <ClassList
@@ -330,14 +334,15 @@ export function BookingWidget() {
               locationId={selectedLocationId}
               isLoading={loadingClasses}
               isLoadingMore={loadingMore}
-            />
-
-            {hasMore && <div ref={sentinelRef} className="h-4" aria-hidden="true" />}
+              onScrollRootChange={setScrollRoot}
+            >
+              {hasMore && <div ref={sentinelRef} className="h-4" aria-hidden="true" />}
+            </ClassList>
           </div>
         )}
       </div>
 
-      <footer className="border-t border-border py-3 text-center">
+      <footer className="shrink-0 border-t border-border py-3 text-center">
         <p className="text-xs text-muted-foreground">Powered by FitnezStudios</p>
       </footer>
     </div>

@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { Toaster } from 'react-hot-toast'
 import { EmbedBlocked } from '@/components/booking/embed-blocked'
 import {
   getEmbedOriginForApi,
@@ -34,6 +35,22 @@ type EmbedStatus = 'checking' | 'allowed' | 'blocked'
 export function BookingWidgetClient() {
   const [status, setStatus] = useState<EmbedStatus>('checking')
   const [parentOrigin, setParentOrigin] = useState<string | null>(null)
+
+  useLayoutEffect(() => {
+    const html = document.documentElement
+    const { overflow: prevHtmlOverflow } = html.style
+    const { overflow: prevBodyOverflow } = document.body.style
+    html.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    html.classList.add('no-scrollbar')
+    document.body.classList.add('no-scrollbar')
+    return () => {
+      html.style.overflow = prevHtmlOverflow
+      document.body.style.overflow = prevBodyOverflow
+      html.classList.remove('no-scrollbar')
+      document.body.classList.remove('no-scrollbar')
+    }
+  }, [])
 
   useLayoutEffect(() => {
     const resolveEmbed = () => {
@@ -77,5 +94,10 @@ export function BookingWidgetClient() {
     return <EmbedBlocked domain={parentOrigin} />
   }
 
-  return <BookingWidget />
+  return (
+    <>
+      <Toaster position="top-right" />
+      <BookingWidget />
+    </>
+  )
 }
