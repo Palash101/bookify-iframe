@@ -41,6 +41,8 @@
   --success-foreground: oklch(0.985 0 0);
   --warning: oklch(0.75 0.15 85);
   --warning-foreground: oklch(0.2 0 0);
+  /* Class list height — screen-based. Try 45dvh, 55dvh, or calc(100dvh - 22rem) */
+  --class-list-height: calc(100dvh - 28rem);
 }
 
 .dark {
@@ -134,4 +136,13 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

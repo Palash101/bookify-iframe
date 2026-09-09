@@ -168,6 +168,7 @@ export function mapBookifyClass(item: Record<string, unknown>): GymClass | null 
     name: pickName(item),
     instructor: String(item.trainer_name ?? item.instructor ?? item.trainer ?? 'Staff'),
     time: startTime ? parseClockTime(startTime) : 'TBD',
+    startTime: startTime || undefined,
     duration:
       startTime && endTime
         ? formatDurationFromTimes(startTime, endTime)
