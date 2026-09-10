@@ -1,8 +1,8 @@
 ﻿'use client'
 
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image'
-import { Calendar, Clock, Info, MapPin } from 'lucide-react'
+import { Clock, Info, MapPin, Timer, User, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatGenderLabel } from '@/lib/bookify/mappers'
 import type { GymClass } from './booking-widget'
@@ -42,13 +42,22 @@ function formatPrice(price: string) {
   }).format(num)
 }
 
-function formatClockTime(value: string) {
-  const parts = value.split(':').map(Number)
-  if (parts.length < 2 || parts.some(Number.isNaN)) return value
-  const [hours, minutes] = parts
-  const period = hours >= 12 ? 'PM' : 'AM'
-  const hour12 = hours % 12 || 12
-  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`
+function getProgramSpotConfig(raw?: Record<string, unknown>) {
+  const program = raw?.program
+  if (!program || typeof program !== 'object' || Array.isArray(program)) {
+    return null
+  }
+
+  const data = program as Record<string, unknown>
+  const threshold = Number(data.spots_left_label)
+  if (!Number.isFinite(threshold)) return null
+
+  const spotName =
+    typeof data.spot_name === 'string' && data.spot_name.trim()
+      ? data.spot_name.trim()
+      : 'Spot'
+
+  return { threshold, spotName }
 }
 
 function buildDateTimeForClass(date: Date, value?: string) {
@@ -128,15 +137,14 @@ export function ClassList({
     })
   }
 
-  const handleBookNow = (
-    event: MouseEvent<HTMLAnchorElement>,
-    gymClass: GymClass,
-  ) => {
-    if (!hasClassAlreadyStarted(gymClass, date)) return
-    event.preventDefault()
-    toast(CLASS_STARTED_MESSAGE, {
-      icon: <Info className="h-5 w-5 text-primary" />,
-    })
+  const openBooking = (gymClass: GymClass, bookingUrl: string) => {
+    if (hasClassAlreadyStarted(gymClass, date)) {
+      toast(CLASS_STARTED_MESSAGE, {
+        icon: <Info className="h-5 w-5 text-primary" />,
+      })
+      return
+    }
+    window.open(bookingUrl, '_blank', 'noreferrer')
   }
 
   const isToday = (() => {
@@ -156,7 +164,7 @@ export function ClassList({
 
       <div
         ref={listRef}
-        className="no-scrollbar space-y-4 overflow-y-auto overscroll-contain"
+        className="no-scrollbar space-y-2.5 overflow-y-auto overscroll-contain"
         style={{ height: 'var(--class-list-height)' }}
       >
         {classes.map((gymClass) => {
@@ -164,9 +172,13 @@ export function ClassList({
             gymClass.fullyBooked || gymClass.enrolled >= gymClass.capacity
           const trainerImage = gymClass.trainerImage ?? gymClass.image
           const isExpanded = expandedIds.has(gymClass.id)
-          const showMore = gymClass.description.length > 120 && !isExpanded
+          const showMore = gymClass.description.length > 90 && !isExpanded
           const displayLocation = gymClass.locationName ?? locationName
           const genderLabel = formatGenderLabel(gymClass.gender)
+          const spotsLeft = Math.max(gymClass.capacity - gymClass.enrolled, 0)
+          const spotConfig = getProgramSpotConfig(gymClass.raw)
+          const showSpotsLeft =
+            !!spotConfig && spotsLeft <= spotConfig.threshold
           const bookingUrl =
             orgId && locationId
               ? `${BOOKING_BASE_URL}/${orgId}/${locationId}/class-details/${gymClass.id}`
@@ -175,112 +187,114 @@ export function ClassList({
           return (
             <article
               key={gymClass.id}
-              className={`overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${
-                isDisabled ? 'opacity-60' : ''
-              }`}
+              role={bookingUrl ? 'link' : undefined}
+              tabIndex={bookingUrl ? 0 : undefined}
+              onClick={() => {
+                if (bookingUrl) openBooking(gymClass, bookingUrl)
+              }}
+              onKeyDown={(event) => {
+                if (!bookingUrl) return
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  openBooking(gymClass, bookingUrl)
+                }
+              }}
+              className={`group relative overflow-hidden rounded-xl border border-border/80 bg-card transition-all hover:border-primary/25 hover:shadow-md ${
+                bookingUrl ? 'cursor-pointer' : ''
+              } ${isDisabled ? 'opacity-60' : ''}`}
             >
-              <div className="flex flex-col sm:flex-row">
-                <div className="relative h-36 w-full shrink-0 sm:h-auto sm:w-36 md:w-40">
+              <div className="flex gap-3 p-2.5 sm:gap-3.5 sm:p-3">
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg ring-1 ring-border/60 sm:h-[4.5rem] sm:w-[4.5rem]">
                   <Image
                     src={trainerImage}
                     alt={gymClass.instructor}
                     fill
-                    className="object-cover object-top"
-                    sizes="(max-width: 640px) 100vw, 208px"
+                    className="object-cover object-top transition-transform duration-300 group-hover:scale-105"
+                    sizes="72px"
                     unoptimized
                   />
                 </div>
 
-                <div className="flex min-w-0 flex-1 flex-col p-3.5 sm:p-4">
-                  <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-                    Class
-                  </span>
-                  <h4 className="mt-1 text-xl font-bold text-foreground">
-                    {gymClass.name}
-                  </h4>
-
-                  {genderLabel && (
-                    <span className="mt-2 inline-flex w-fit rounded-full border border-primary/30 bg-primary/10 px-3 py-0.5 text-xs font-semibold text-primary">
-                      {genderLabel}
-                    </span>
-                  )}
-
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {gymClass.instructor}
-                    </span>
-                  </div>
-
-                  {gymClass.description && (
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      {isExpanded || !showMore
-                        ? gymClass.description
-                        : `${gymClass.description.slice(0, 120)}...`}
-                      {showMore && (
-                        <button
-                          type="button"
-                          onClick={() => toggleExpanded(gymClass.id)}
-                          className="ml-1 font-medium text-primary hover:underline"
-                        >
-                          Show more
-                        </button>
-                      )}
-                      {isExpanded && gymClass.description.length > 120 && (
-                        <button
-                          type="button"
-                          onClick={() => toggleExpanded(gymClass.id)}
-                          className="ml-1 font-medium text-primary hover:underline"
-                        >
-                          Show less
-                        </button>
-                      )}
-                    </p>
-                  )}
-
-                  <div className="mt-3 space-y-1.5 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 shrink-0 text-primary/70" />
-                      <span>{formatFullDate(date)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 shrink-0 text-primary/70" />
-                      <span>
-                        {gymClass.time}
-                        {gymClass.endTime && ` - ${formatClockTime(gymClass.endTime)}`}
-                        {gymClass.duration !== '-' && ` • ${gymClass.duration}`}
-                      </span>
-                    </div>
-                    {displayLocation && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 shrink-0 text-primary/70" />
-                        <span>{displayLocation}</span>
+                <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <h4 className="truncate text-[15px] font-semibold leading-tight text-foreground sm:text-base">
+                          {gymClass.name}
+                        </h4>
+                        {gymClass.themeName && (
+                          <span className="truncate text-xs font-medium text-muted-foreground">
+                            {gymClass.themeName}
+                          </span>
+                        )}
                       </div>
+                      <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        <User className="h-3 w-3 shrink-0 text-primary/70" />
+                        <span className="truncate">{gymClass.instructor}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted-foreground sm:text-xs">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0 text-primary/70" />
+                        <span>{gymClass.time}</span>
+                      </span>
+                      {gymClass.duration !== '-' && (
+                        <span className="inline-flex items-center gap-1">
+                          <Timer className="h-3 w-3 shrink-0 text-primary/70" />
+                          <span>{gymClass.duration}</span>
+                        </span>
+                      )}
+                      {displayLocation && (
+                        <span className="inline-flex max-w-[10rem] items-center gap-1 sm:max-w-[14rem]">
+                          <MapPin className="h-3 w-3 shrink-0 text-primary/70" />
+                          <span className="truncate">{displayLocation}</span>
+                        </span>
+                      )}
+                    </div>
+
+                    {gymClass.description && (
+                      <p className="text-[11px] leading-snug text-muted-foreground/90 sm:text-xs">
+                        {isExpanded || !showMore
+                          ? gymClass.description
+                          : `${gymClass.description.slice(0, 90)}...`}
+                        {(showMore ||
+                          (isExpanded && gymClass.description.length > 90)) && (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              toggleExpanded(gymClass.id)
+                            }}
+                            className="ml-1 font-medium text-primary hover:underline"
+                          >
+                            {isExpanded ? 'Less' : 'More'}
+                          </button>
+                        )}
+                      </p>
                     )}
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-secondary/40 px-3.5 py-2.5">
-                    <span className="text-sm text-muted-foreground">
-                      {isDisabled ? 'Fully booked' : 'Available to book'}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      {gymClass.price && gymClass.bookingType === 'price' ? (
-                        <span className="text-lg font-bold text-foreground">
-                          {formatPrice(gymClass.price)}
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
+                    {genderLabel && (
+                      <span className="inline-flex rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+                        {genderLabel}
+                      </span>
+                    )}
+                    {showSpotsLeft && spotConfig && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground sm:text-xs">
+                        <span>
+                          {isDisabled
+                            ? 'Fully booked'
+                            : `${spotsLeft} ${spotConfig.spotName} Left`}
                         </span>
-                      ) : null}
-                      {!isDisabled && bookingUrl ? (
-                        <a
-                          href={bookingUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(event) => handleBookNow(event, gymClass)}
-                          onAuxClick={(event) => handleBookNow(event, gymClass)}
-                          className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                        >
-                          Book now
-                        </a>
-                      ) : null}
-                    </div>
+                      </span>
+                    )}
+                    {gymClass.price && gymClass.bookingType === 'price' ? (
+                      <span className="text-sm font-bold text-foreground">
+                        {formatPrice(gymClass.price)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </div>

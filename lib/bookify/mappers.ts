@@ -133,12 +133,7 @@ function buildDescription(item: Record<string, unknown>): string {
     return String(explicit).trim()
   }
 
-  const parts: string[] = []
-  if (item.theme_name) parts.push(String(item.theme_name))
-  if (item.booking_type === 'price' && item.price) {
-    parts.push(`$${item.price}`)
-  }
-  return parts.join(' | ') || 'Gym class session'
+  return ''
 }
 
 export function formatGenderLabel(gender?: string | null): string | null {
