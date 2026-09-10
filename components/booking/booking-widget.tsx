@@ -292,9 +292,19 @@ export function BookingWidget() {
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden">
             <div className="shrink-0 space-y-5">
-              <div>
-                <h1 className="text-2xl font-bold text-primary">Classes</h1>
-                <div className="mt-1 h-1 w-16 rounded-full bg-primary" />
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-600">
+                    Book your session
+                  </p>
+                  <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                    Classes
+                  </h1>
+                  <p className="mt-1 max-w-md text-sm leading-snug text-slate-500">
+                    Pick a date and location to find available classes near you.
+                  </p>
+                </div>
+                <div className="hidden h-10 w-1.5 shrink-0 rounded-full bg-gradient-to-b from-sky-400 to-sky-600 sm:block" />
               </div>
 
               <DateCalendar
